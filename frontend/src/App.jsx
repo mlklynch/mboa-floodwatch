@@ -1,70 +1,94 @@
-import './App.css';
-import React, { useEffect, useRef, useState } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-import * as turf from "@turf/turf";
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+/**
+ * Mboa-FloodWatch — Main Application Component
+ * Citizen flood monitoring platform for Cameroon.
+ */
 
-// Configuration Firebase
-const app = initializeApp({
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  // ... autres clés .env
-});
-const db = getFirestore(app);
+import React, { useState, useCallback, useEffect } from "react";
+import Navbar from "./components/Navbar";
+import SidePanel from "./components/SidePanel";
+import MboaMap from "./components/MboaMap";
+import useFloodData from "./hooks/useFloodData";
+import useGeolocation from "./hooks/useGeolocation";
 
-export default function MboaMap() {
-  const mapRef = useRef(null);
-  const [polygons, setPolygons] = useState([]);
-  const [risk, setRisk] = useState(null);
+export default function App() {
+  const {
+    events,
+    selectedEventId,
+    setSelectedEventId,
+    polygons,
+    stats,
+    loading,
+    isDemo,
+  } = useFloodData();
 
-  useEffect(() => {
-    // Initialisation OSM
-    const map = L.map('map').setView([4.05, 9.7], 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap'
-    }).addTo(map);
-    mapRef.current = map;
+  const {
+    position: userPosition,
+    riskLevel: userRisk,
+    locating,
+    locate,
+    reset: resetGeolocation,
+  } = useGeolocation();
 
-    // Chargement des polygones depuis Firestore
-    const loadPolygons = async () => {
-      const { collection, getDocs } = await import("firebase/firestore");
-      const querySnapshot = await getDocs(collection(db, "polygons"));
-      const loadedPolygons = querySnapshot.docs.map(doc => doc.data());
-      setPolygons(loadedPolygons);
-    };
-    loadPolygons();
+  const [toast, setToast] = useState(null);
+
+  // Toast notification handler
+  const showToast = useCallback((message, type = "success") => {
+    setToast({ message, type });
   }, []);
 
-  const handleGeoloc = () => {
-    navigator.geolocation.getCurrentPosition((pos) => {
-      const { latitude, longitude } = pos.coords;
-      const point = turf.point([longitude, latitude]);
-      
-      let inDanger = false;
-      polygons.forEach(p => {
-        const geom = typeof p.geometry === 'string' ? JSON.parse(p.geometry) : p.geometry;
-        if (turf.booleanPointInPolygon(point, turf.feature(geom))) inDanger = true;
-      });
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
-      setRisk(inDanger ? "🔴 CRITIQUE" : "🟢 SÛR");
-      L.marker([latitude, longitude]).addTo(mapRef.current).bindPopup("Ma Position").openPopup();
-      mapRef.current.setView([latitude, longitude], 13);
-    });
-  };
+  // Trigger geolocation with current polygons
+  const handleLocate = useCallback(() => {
+    locate(polygons);
+  }, [locate, polygons]);
+
+  // Scroll side panel to subscribe form
+  const handleSubscribeClick = useCallback(() => {
+    const formSection = document.querySelector(".subscribe-form");
+    if (formSection) {
+      formSection.scrollIntoView({ behavior: "smooth" });
+    }
+  }, []);
 
   return (
-    <div className="mboa-map-wrapper">
-      <div id="map" className="mboa-leaflet-map"></div>
-      <div className="mboa-toolbar">
-        <h2 style={{color: '#007A5E', margin: 0}}>Mboa-FloodWatch</h2>
-        <button className="mboa-btn-yellow" onClick={handleGeoloc}>📍 Ma Position</button>
+    <div className="app-shell">
+      <Navbar onSubscribeClick={handleSubscribeClick} />
+
+      <div className="main-content">
+        <SidePanel
+          stats={stats}
+          events={events}
+          selectedEventId={selectedEventId}
+          onSelectEvent={setSelectedEventId}
+          loading={loading}
+          isDemo={isDemo}
+          onToast={showToast}
+        />
+
+        <MboaMap
+          polygons={polygons}
+          loading={loading}
+          userPosition={userPosition}
+          userRisk={userRisk}
+          locating={locating}
+          onLocate={handleLocate}
+          onCloseResult={resetGeolocation}
+        />
       </div>
-      {risk && (
-        <div className="mboa-result-panel">
-          <h3>Statut de Risque</h3>
-          <h2 style={{ color: risk.includes("🔴") ? "#CE1126" : "#007A5E" }}>{risk}</h2>
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`toast toast-${toast.type}`}>
+          <span>{toast.message}</span>
+          <button className="toast-close" onClick={() => setToast(null)}>
+            &#10005;
+          </button>
         </div>
       )}
     </div>
