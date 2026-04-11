@@ -1,0 +1,32 @@
+name: Mboa-FloodWatch Daily Analysis
+
+on:
+  schedule:
+    # S'exécute tous les jours à 02:00 UTC (environ 03:00 au Cameroun)
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Permet de lancer l'analyse manuellement depuis GitHub
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install earthengine-api firebase-admin python-dotenv
+
+      - name: Create Auth Files
+        run: |
+          echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > serviceAccountKey.json
+          echo "${{ secrets.ENV_FILE }}" > .env
+
+      - name: Run Flood Detection
+        run: python backend/gee/detection_radar.py
