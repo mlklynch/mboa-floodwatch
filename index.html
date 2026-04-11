@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mboa-FloodWatch — Surveillance des Inondations au Cameroun</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+
+  <style>
+    /* ═══════════════════════════════════════════════════
+       DESIGN SYSTEM — CAMEROUN PALETTE
+       ═══════════════════════════════════════════════════ */
+    :root {
+      --green:       #007A5E;
+      --green-light: #00A87D;
+      --green-dark:  #005944;
+      --red:         #CE1126;
+      --red-light:   #FF2E4A;
+      --yellow:      #FCD116;
+      --yellow-dark: #E8BE00;
+      --white:       #FFFFFF;
+      --gray-50:     #F8F9FA;
+      --gray-100:    #F0F1F2;
+      --gray-200:    #DDE0E4;
+      --gray-600:    #4B5563;
+      --gray-900:    #111827;
+      --shadow-sm:   0 2px 8px rgba(0,0,0,.08);
+      --shadow-md:   0 8px 32px rgba(0,0,0,.14);
+      --shadow-lg:   0 20px 60px rgba(0,0,0,.2);
+      --radius-sm:   8px;
+      --radius-md:   16px;
+      --radius-lg:   24px;
+      --font-main:   'Sora', sans-serif;
+      --font-mono:   'Space Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: var(--font-main);
+      background: var(--gray-900);
+      color: var(--gray-900);
+      overflow: hidden;
+    }
+
+    /* ── Layout principal ─────────────────────────────── */
+    .app-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* ═══════════════════════════════════════════════════
+       NAVBAR
+       ═══════════════════════════════════════════════════ */
+    .navbar {
+      background: var(--green);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 60px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 16px rgba(0,122,94,.4);
+      z-index: 1000;
+      position: relative;
+    }
+
+    .navbar::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--green) 33%, var(--red) 33% 66%, var(--yellow) 66%);
+    }
+
+    .navbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      position: relative;
+    }
+
+    .brand-name {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--white);
+      letter-spacing: -0.3px;
+    }
+
+    .brand-name span {
+      color: var(--yellow);
+    }
+
+    .navbar-subtitle {
+      font-size: 11px;
+      color: rgba(255,255,255,.65);
+      font-weight: 400;
+      letter-spacing: 0.5px;
+      display: block;
+      line-height: 1;
+    }
+
+    .navbar-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 12px;
+      color: var(--white);
+      font-weight: 600;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--yellow);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: .6; transform: scale(1.4); }
+    }
+
+    .navbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-nav {
+      padding: 7px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      font-family: var(--font-main);
+      transition: all .2s;
+    }
+
+    .btn-nav-ghost {
+      background: transparent;
+      border: 1.5px solid rgba(255,255,255,.4);
+      color: var(--white);
+    }
+    .btn-nav-ghost:hover {
+      background: rgba(255,255,255,.15);
+      border-color: rgba(255,255,255,.7);
+    }
+
+    .btn-nav-yellow {
+      background: var(--yellow);
+      color: var(--gray-900);
+    }
+    .btn-nav-yellow:hover {
+      background: var(--yellow-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(252,209,22,.4);
+    }
+
+    /* ═══════════════════════════════════════════════════
+       CONTENU PRINCIPAL (carte + sidepanel)
+       ═══════════════════════════════════════════════════ */
+    .main-content {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    /* ── Side Panel Gauche ────────────────────────────── */
+    .side-panel {
+      width: 320px;
+      background: var(--white);
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--gray-200);
+      overflow-y: auto;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .panel-section {
+      padding: 20px;
+      border-bottom: 1px solid var(--gray-100);
+    }
+
+    .panel-section:last-child { border-bottom: none; }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--gray-600);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ── Statistiques d'alerte ────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .stat-card {
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card-critique { background: linear-gradient(135deg, #fff0f2, #ffe0e4); border: 1px solid #ffb3bc; }
+    .stat-card-alerte   { background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1px solid #fde68a; }
+    .stat-card-vigilance{ background: linear-gradient(135deg, #ecfdf5, #d1fae5); border: 1px solid #6ee7b7; }
+    .stat-card-total    { background: linear-gradient(135deg, #eff6ff, #dbeafe); border: 1px solid #bfdbfe; }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--gray-600);
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      line-height: 1;
+    }
+
+    .stat-card-critique  .stat-value { color: var(--red); }
+    .stat-card-alerte    .stat-value { color: #B45309; }
+    .stat-card-vigilance .stat-value { color: var(--green); }
+    .stat-card-total     .stat-value { color: #1D4ED8; }
+
+    /* ── Sélecteur de date / Archive ─────────────────── */
+    .archive-selector {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .archive-selector label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gray-600);
+    }
+
+    .archive-selector select,
+    .archive-selector input[type="date"] {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid var(--gray-200);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-main);
+      font-size: 13px;
+      color: var(--gray-900);
+      background: var(--white);
+      cursor: pointer;
+      transition: border-color .2s;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    .archive-selector select:focus,
+    .archive-selector input[type="date"]:focus {
+      outline: none;
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px rgba(0,122,94,.15);
+    }
+
+    .btn-load-archive {
+      width: 100%;
+      padding: 11px;
+      background: var(--green);
+      color: var(--white);
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-main);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-load-archive:hover {
+      background: var(--green-light);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,122,94,.3);
+    }
+
+    /* ── Formulaire d'inscription ─────────────────────── */
+    .subscribe-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .form-group label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gray-600);
+    }
+
+    .form-input {
+      padding: 10px 14px;
+      border: 1.5px solid var(--gray-200);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-main);
+      font-size: 13px;
+      color: var(--gray-900);
+      background: var(--white);
+      transition: border-color .2s, box-shadow .2s;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px rgba(0,122,94,.12);
+    }
+
+    .btn-subscribe {
+      width: 100%;
+      padding: 12px;
+      background: var(--yellow);
+      color: var(--gray-900);
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-main);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .2s;
+      margin-top: 4px;
+    }
+
+    .btn-subscribe:hover {
+      background: var(--yellow-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(252,209,22,.5);
+    }
+
+    .subscribe-note {
+      font-size: 11px;
+      color: var(--gray-600);
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    /* ── Toast notification ───────────────────────────── */
+    .toast {
+      position: fixed;
+      top: 76px;
+      right: 24px;
+      z-index: 9999;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 18px;
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-lg);
+      max-width: 320px;
+      animation: slideIn .3s ease;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .toast-success { background: var(--green); color: var(--white); }
+    .toast-error   { background: var(--red);   color: var(--white); }
+    .toast-warning { background: var(--yellow); color: var(--gray-900); }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(30px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    /* ═══════════════════════════════════════════════════
+       MAP AREA
+       ═══════════════════════════════════════════════════ */
+    .map-area {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #mboa-map {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── Bouton flottant Ma Position ──────────────────── */
+    .btn-my-position {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      background: var(--white);
+      border: 2px solid var(--green);
+      border-radius: 50px;
+      font-family: var(--font-main);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--green);
+      cursor: pointer;
+      box-shadow: var(--shadow-md);
+      transition: all .25s;
+    }
+
+    .btn-my-position:hover {
+      background: var(--green);
+      color: var(--white);
+      transform: scale(1.04);
+      box-shadow: 0 8px 24px rgba(0,122,94,.35);
+    }
+
+    .btn-my-position.locating {
+      background: var(--yellow);
+      border-color: var(--yellow-dark);
+      color: var(--gray-900);
+      pointer-events: none;
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Légende flottante ────────────────────────────── */
+    .map-legend {
+      position: absolute;
+      bottom: 32px;
+      right: 20px;
+      z-index: 800;
+      background: var(--white);
+      border-radius: var(--radius-md);
+      padding: 16px 18px;
+      box-shadow: var(--shadow-md);
+      min-width: 160px;
+      border: 1px solid var(--gray-200);
+    }
+
+    .legend-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: var(--gray-600);
+      margin-bottom: 12px;
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--gray-900);
+    }
+
+    .legend-row:last-child { margin-bottom: 0; }
+
+    .legend-swatch {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      border: 1.5px solid rgba(0,0,0,.12);
+    }
+
+    /* ── Panneau résultat Ma Position ─────────────────── */
+    .position-result {
+      position: absolute;
+      bottom: 32px;
+      left: 20px;
+      z-index: 800;
+      background: var(--white);
+      border-radius: var(--radius-md);
+      padding: 20px 24px;
+      box-shadow: var(--shadow-lg);
+      max-width: 280px;
+      border-top: 5px solid var(--green);
+      animation: popIn .3s cubic-bezier(.34,1.56,.64,1);
+    }
+
+    @keyframes popIn {
+      from { opacity: 0; transform: translateY(20px) scale(.95); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .position-result.risk-1 { border-color: var(--green); }
+    .position-result.risk-2 { border-color: var(--yellow); }
+    .position-result.risk-3 { border-color: var(--red); }
+    .position-result.risk-0 { border-color: var(--green); }
+
+    .result-icon-big {
+      font-size: 36px;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .result-title {
+      font-size: 16px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .result-title.safe    { color: var(--green); }
+    .result-title.warning { color: var(--yellow-dark); }
+    .result-title.danger  { color: var(--red); }
+
+    .result-body {
+      font-size: 13px;
+      color: var(--gray-600);
+      line-height: 1.5;
+    }
+
+    .result-coords {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--gray-600);
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--gray-100);
+    }
+
+    .btn-close-result {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: var(--gray-100);
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--gray-600);
+      transition: background .2s;
+    }
+
+    .btn-close-result:hover { background: var(--gray-200); }
+
+    /* ── Overlay de chargement ────────────────────────── */
+    .loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(17,24,39,.6);
+      backdrop-filter: blur(4px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 900;
+      color: var(--white);
+      gap: 16px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .wave-emoji {
+      font-size: 48px;
+      animation: waveFloat 1.5s ease-in-out infinite;
+    }
+
+    @keyframes waveFloat {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-12px); }
+    }
+
+    /* ── Popups Leaflet personnalisés ─────────────────── */
+    .leaflet-popup-content-wrapper {
+      border-radius: var(--radius-sm) !important;
+      padding: 0 !important;
+      overflow: hidden;
+      box-shadow: var(--shadow-md) !important;
+    }
+
+    .leaflet-popup-content { margin: 0 !important; }
+
+    .mboa-popup {
+      padding: 14px 16px;
+      font-family: var(--font-main);
+      min-width: 160px;
+    }
+
+    .popup-badge {
+      display: inline-block;
+      color: var(--white);
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .mboa-popup p {
+      font-size: 13px;
+      margin: 4px 0;
+      color: var(--gray-900);
+    }
+
+    /* ═══════════════════════════════════════════════════
+       RESPONSIVE
+       ═══════════════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      .side-panel {
+        position: absolute;
+        left: 0; top: 0; bottom: 0;
+        transform: translateX(-100%);
+        transition: transform .3s ease;
+        z-index: 900;
+        box-shadow: var(--shadow-lg);
+      }
+      .side-panel.open { transform: translateX(0); }
+      .brand-subtitle { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ═══════════════════════════════════ NAVBAR ════ -->
+  <nav class="navbar">
+    <a href="#" class="navbar-brand">
+      <!-- Logo SVG Mboa-FloodWatch -->
+      <svg class="brand-logo" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Contour Cameroun stylisé -->
+        <path d="M12 8 C10 10 9 14 10 18 C11 21 10 24 12 26 C14 28 18 30 22 29 C26 28 30 25 30 21 C30 17 28 13 25 11 C22 9 15 6 12 8Z"
+              fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.6)" stroke-width="1.5"/>
+        <!-- Onde radar -->
+        <circle cx="19" cy="19" r="7"  fill="none" stroke="#FCD116" stroke-width="1.5" stroke-dasharray="3 2" opacity=".8"/>
+        <circle cx="19" cy="19" r="12" fill="none" stroke="#FCD116" stroke-width="1"   stroke-dasharray="3 3" opacity=".4"/>
+        <!-- Goutte d'eau -->
+        <path d="M19 12 C19 12 15 17 15 20 C15 22.2 16.8 24 19 24 C21.2 24 23 22.2 23 20 C23 17 19 12 19 12Z"
+              fill="#FCD116" opacity=".9"/>
+      </svg>
+      <div>
+        <div class="brand-name">Mboa-<span>FloodWatch</span></div>
+        <span class="navbar-subtitle">Surveillance Satellite • Cameroun</span>
+      </div>
+    </a>
+
+    <div class="navbar-status">
+      <span class="status-dot"></span>
+      Surveillance Active
+    </div>
+
+    <div class="navbar-actions">
+      <button class="btn-nav btn-nav-ghost" id="btnTogglePanel">☰ Panneau</button>
+      <button class="btn-nav btn-nav-yellow" id="btnOpenSubscribe">🔔 S'inscrire aux alertes</button>
+    </div>
+  </nav>
+
+  <!-- ════════════════════════ CONTENU PRINCIPAL ════ -->
+  <div class="main-content">
+
+    <!-- Side Panel -->
+    <aside class="side-panel" id="sidePanel">
+
+      <!-- Statistiques -->
+      <div class="panel-section">
+        <div class="section-title">📊 Situation Actuelle</div>
+        <div class="stats-grid">
+          <div class="stat-card stat-card-critique">
+            <div class="stat-label">🔴 Critique</div>
+            <div class="stat-value" id="statCritique">—</div>
+          </div>
+          <div class="stat-card stat-card-alerte">
+            <div class="stat-label">🟡 Alerte</div>
+            <div class="stat-value" id="statAlerte">—</div>
+          </div>
+          <div class="stat-card stat-card-vigilance">
+            <div class="stat-label">🟢 Vigilance</div>
+            <div class="stat-value" id="statVigilance">—</div>
+          </div>
+          <div class="stat-card stat-card-total">
+            <div class="stat-label">📍 Zones</div>
+            <div class="stat-value" id="statTotal">—</div>
+          </div>
+        </div>
+        <div style="margin-top:12px; font-size:12px; color:var(--gray-600); display:flex; align-items:center; gap:6px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--yellow);animation:pulse 2s infinite;display:inline-block;"></span>
+          Données Sentinel-1 SAR · <span id="lastUpdate">—</span>
+        </div>
+      </div>
+
+      <!-- Archive historique F4 -->
+      <div class="panel-section">
+        <div class="section-title">📅 Archives Historiques</div>
+        <div class="archive-selector">
+          <label>Saison de pluies :</label>
+          <select id="archiveSeason">
+            <option value="2024-10">Octobre 2024</option>
+            <option value="2024-09">Septembre 2024</option>
+            <option value="2024-08">Août 2024</option>
+            <option value="2023-10">Octobre 2023</option>
+            <option value="2023-09">Septembre 2023</option>
+            <option value="2022-10">Octobre 2022</option>
+          </select>
+          <label>Ou sélectionner une date :</label>
+          <input type="date" id="archiveDate" max="2025-01-01"/>
+          <button class="btn-load-archive" id="btnLoadArchive">
+            🛰️ Charger l'analyse satellite
+          </button>
+        </div>
+      </div>
+
+      <!-- Formulaire inscription F3 -->
+      <div class="panel-section" id="subscribeSection">
+        <div class="section-title">🔔 Recevoir les Alertes</div>
+        <form class="subscribe-form" id="subscribeForm" onsubmit="return handleSubscribe(event)">
+          <div class="form-group">
+            <label>Nom complet</label>
+            <input type="text" class="form-input" id="subName" placeholder="Kande Martin" required/>
+          </div>
+          <div class="form-group">
+            <label>Ville</label>
+            <input type="text" class="form-input" id="subCity" placeholder="Yaoundé, Douala..." required/>
+          </div>
+          <div class="form-group">
+            <label>Téléphone (Cameroun)</label>
+            <input type="tel" class="form-input" id="subPhone" placeholder="+237 6XX XXX XXX"/>
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" class="form-input" id="subEmail" placeholder="email@exemple.cm"/>
+          </div>
+          <button type="submit" class="btn-subscribe">
+            ✅ S'inscrire gratuitement
+          </button>
+          <p class="subscribe-note">
+            Vous recevrez une alerte SMS ou email dès qu'une inondation est<br/>
+            détectée dans votre zone par satellite.
+          </p>
+        </form>
+      </div>
+
+    </aside>
+
+    <!-- Zone Carte -->
+    <div class="map-area">
+      <div id="mboa-map"></div>
+
+      <!-- Bouton Ma Position -->
+      <button class="btn-my-position" id="btnMyPosition">
+        <span id="posIcon">📍</span>
+        <span id="posLabel">Ma Position</span>
+      </button>
+
+      <!-- Légende -->
+      <div class="map-legend">
+        <div class="legend-title">⚠️ Niveau de Risque</div>
+        <div class="legend-row">
+          <div class="legend-swatch" style="background:#CE1126;"></div>
+          <span>🔴 Critique</span>
+        </div>
+        <div class="legend-row">
+          <div class="legend-swatch" style="background:#FCD116;"></div>
+          <span>🟡 Alerte</span>
+        </div>
+        <div class="legend-row">
+          <div class="legend-swatch" style="background:#007A5E;"></div>
+          <span>🟢 Vigilance</span>
+        </div>
+        <div class="legend-row">
+          <div class="legend-swatch" style="background:#aaa; opacity:.4;"></div>
+          <span>⬜ Zone sûre</span>
+        </div>
+        <hr style="margin:10px 0; border-color:var(--gray-100);"/>
+        <div style="font-size:10px; color:var(--gray-600); text-align:center;">
+          Source : Sentinel-1 SAR (Copernicus)
+        </div>
+      </div>
+
+      <!-- Résultat Ma Position (caché par défaut) -->
+      <div class="position-result" id="positionResult" style="display:none;">
+        <button class="btn-close-result" onclick="closePositionResult()">✕</button>
+        <span class="result-icon-big" id="resIcon"></span>
+        <div class="result-title" id="resTitle"></div>
+        <div class="result-body" id="resBody"></div>
+        <div class="result-coords" id="resCoords"></div>
+      </div>
+
+      <!-- Overlay de chargement -->
+      <div class="loading-overlay" id="loadingOverlay">
+        <span class="wave-emoji">🌊</span>
+        <span>Chargement des données satellite...</span>
+        <span style="font-size:12px; opacity:.6; font-weight:400;">Sentinel-1 SAR · Google Earth Engine</span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ SCRIPTS ════ -->
+<script>
+/* ═══════════════════════════════════════════════════
+   MBOA-FLOODWATCH — Application JavaScript
+   ═══════════════════════════════════════════════════ */
+
+const RISK_CONFIG = {
+  1: { color: '#007A5E', label: 'Vigilance',  emoji: '🟢', weight: 2,   fillOpacity: 0.45, titleClass: 'safe'    },
+  2: { color: '#FCD116', label: 'Alerte',     emoji: '🟡', weight: 2,   fillOpacity: 0.55, titleClass: 'warning' },
+  3: { color: '#CE1126', label: 'Critique',   emoji: '🔴', weight: 2.5, fillOpacity: 0.65, titleClass: 'danger'  },
+};
+
+// ── Données de démonstration (simulant Firestore) ────────────────────────────
+// En production, ces données viendraient de Firebase/Firestore
+const DEMO_FLOOD_DATA = {
+  "2024-10": {
+    date: "Octobre 2024",
+    polygons: [
+      // Zone critique — Douala (inondation côtière)
+      { risk: 3, coords: [[4.05,9.65],[4.08,9.72],[4.03,9.75],[3.98,9.70],[4.00,9.63],[4.05,9.65]] },
+      { risk: 3, coords: [[4.12,9.68],[4.15,9.74],[4.10,9.77],[4.07,9.71],[4.12,9.68]] },
+      // Zone alerte — Basse Sanaga
+      { risk: 2, coords: [[3.75,10.1],[3.80,10.18],[3.72,10.22],[3.68,10.14],[3.75,10.1]] },
+      { risk: 2, coords: [[3.60,10.25],[3.66,10.33],[3.58,10.36],[3.54,10.28],[3.60,10.25]] },
+      // Zone vigilance — Yaoundé périphérie
+      { risk: 1, coords: [[3.92,11.42],[3.97,11.50],[3.90,11.54],[3.85,11.46],[3.92,11.42]] },
+      { risk: 1, coords: [[3.80,11.30],[3.85,11.38],[3.78,11.41],[3.74,11.33],[3.80,11.30]] },
+      // Zone critique — Nord (inondations Bénoué)
+      { risk: 3, coords: [[9.20,13.30],[9.26,13.40],[9.18,13.45],[9.13,13.35],[9.20,13.30]] },
+      { risk: 3, coords: [[9.10,13.20],[9.16,13.30],[9.08,13.34],[9.03,13.24],[9.10,13.20]] },
+      // Zone alerte — Adamaoua
+      { risk: 2, coords: [[7.30,13.55],[7.36,13.64],[7.28,13.68],[7.23,13.58],[7.30,13.55]] },
+      // Zone vigilance — Littoral
+      { risk: 1, coords: [[4.55,9.90],[4.60,9.98],[4.52,10.02],[4.48,9.94],[4.55,9.90]] },
+    ]
+  },
+  "2024-09": {
+    date: "Septembre 2024",
+    polygons: [
+      { risk: 2, coords: [[4.01,9.66],[4.05,9.73],[4.00,9.76],[3.96,9.69],[4.01,9.66]] },
+      { risk: 1, coords: [[3.85,10.15],[3.90,10.22],[3.82,10.26],[3.78,10.18],[3.85,10.15]] },
+      { risk: 2, coords: [[9.15,13.25],[9.20,13.34],[9.12,13.38],[9.08,13.29],[9.15,13.25]] },
+    ]
+  },
+  "2023-10": {
+    date: "Octobre 2023",
+    polygons: [
+      { risk: 3, coords: [[4.08,9.67],[4.13,9.76],[4.06,9.80],[4.01,9.71],[4.08,9.67]] },
+      { risk: 3, coords: [[9.22,13.32],[9.28,13.43],[9.20,13.48],[9.15,13.37],[9.22,13.32]] },
+      { risk: 2, coords: [[3.78,10.12],[3.83,10.20],[3.75,10.24],[3.71,10.16],[3.78,10.12]] },
+      { risk: 1, coords: [[3.94,11.44],[3.99,11.52],[3.92,11.56],[3.87,11.48],[3.94,11.44]] },
+      { risk: 1, coords: [[5.95,10.15],[6.00,10.23],[5.92,10.27],[5.88,10.19],[5.95,10.15]] },
+    ]
+  }
+};
+
+// ── Initialisation Leaflet ────────────────────────────────────────────────────
+const map = L.map('mboa-map', {
+  center: [5.5, 12.3],
+  zoom:   6,
+  zoomControl: false,
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© OpenStreetMap © CARTO',
+  subdomains: 'abcd',
+  maxZoom: 19
+}).addTo(map);
+
+L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
+// ── Calque de risque ──────────────────────────────────────────────────────────
+let riskLayer   = null;
+let allPolygons = [];
+
+function renderFloodData(dataKey) {
+  showLoading(true);
+
+  // Nettoyer
+  if (riskLayer) { map.removeLayer(riskLayer); riskLayer = null; }
+  allPolygons = [];
+
+  const dataset = DEMO_FLOOD_DATA[dataKey];
+  if (!dataset) { showLoading(false); return; }
+
+  document.getElementById('lastUpdate').textContent = dataset.date;
+
+  const layers = [];
+  let stats = { 1: 0, 2: 0, 3: 0 };
+
+  dataset.polygons.forEach((poly, i) => {
+    const r      = poly.risk;
+    const cfg    = RISK_CONFIG[r];
+    const latlngs = poly.coords.map(c => [c[0], c[1]]);
+
+    const leafPoly = L.polygon(latlngs, {
+      color:       cfg.color,
+      fillColor:   cfg.color,
+      fillOpacity: cfg.fillOpacity,
+      weight:      cfg.weight,
+    });
+
+    leafPoly.bindPopup(`
+      <div class="mboa-popup">
+        <span class="popup-badge" style="background:${cfg.color};">
+          ${cfg.emoji} ${cfg.label}
+        </span>
+        <p>Niveau de risque : <strong>${cfg.label}</strong></p>
+        <p style="font-size:12px;color:#666;">Détecté par Sentinel-1 SAR · ${dataset.date}</p>
+      </div>
+    `);
+
+    leafPoly.on('mouseover', () => leafPoly.setStyle({ fillOpacity: 0.85 }));
+    leafPoly.on('mouseout',  () => leafPoly.setStyle({ fillOpacity: cfg.fillOpacity }));
+
+    layers.push(leafPoly);
+    allPolygons.push({ risk: r, coords: poly.coords });
+    stats[r]++;
+  });
+
+  riskLayer = L.layerGroup(layers).addTo(map);
+
+  // Mettre à jour les stats
+  document.getElementById('statCritique').textContent  = stats[3];
+  document.getElementById('statAlerte').textContent    = stats[2];
+  document.getElementById('statVigilance').textContent = stats[1];
+  document.getElementById('statTotal').textContent     = dataset.polygons.length;
+
+  // Zoomer sur les zones (Cameroun complet)
+  setTimeout(() => {
+    map.fitBounds([[1.6, 8.4], [12.4, 16.2]], { padding: [20, 20] });
+    showLoading(false);
+  }, 800);
+}
+
+// ── F2 : Outil "Ma Position" ──────────────────────────────────────────────────
+let userMarker = null;
+
+function handleMyPosition() {
+  const btn   = document.getElementById('btnMyPosition');
+  const label = document.getElementById('posLabel');
+  const icon  = document.getElementById('posIcon');
+
+  if (!navigator.geolocation) {
+    showToast('⚠️ Géolocalisation non supportée par ce navigateur.', 'warning');
+    return;
+  }
+
+  btn.classList.add('locating');
+  icon.textContent  = '';
+  label.innerHTML   = '<span class="spinner"></span> Localisation...';
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+
+      // Détecter la zone à risque (point-in-polygon simplifié)
+      const risk = getPointRisk(lat, lng);
+      const cfg  = RISK_CONFIG[risk];
+
+      // Marqueur utilisateur
+      if (userMarker) map.removeLayer(userMarker);
+      const markerColor = risk > 0 ? cfg.color : '#007A5E';
+      const markerIcon  = L.divIcon({
+        className: '',
+        html: `<div style="
+          width:40px;height:40px;border-radius:50%;
+          background:${markerColor};border:3px solid white;
+          box-shadow:0 4px 16px rgba(0,0,0,.4);
+          display:flex;align-items:center;justify-content:center;
+          font-size:18px;">📍</div>`,
+        iconSize:   [40,40],
+        iconAnchor: [20,20],
+      });
+      userMarker = L.marker([lat, lng], { icon: markerIcon }).addTo(map);
+      map.setView([lat, lng], 11, { animate: true });
+
+      // Afficher le résultat
+      showPositionResult(lat, lng, risk, cfg);
+
+      btn.classList.remove('locating');
+      icon.textContent  = '📍';
+      label.textContent = 'Ma Position';
+    },
+    (err) => {
+      showToast('❌ Impossible d\'obtenir votre position : ' + err.message, 'error');
+      btn.classList.remove('locating');
+      icon.textContent  = '📍';
+      label.textContent = 'Ma Position';
+    },
+    { enableHighAccuracy: true, timeout: 12000 }
+  );
+}
+
+function getPointRisk(lat, lng) {
+  // Test point-in-polygon (ray casting) sur les polygones actuels
+  let maxRisk = 0;
+  for (const poly of allPolygons) {
+    if (pointInPolygon(lat, lng, poly.coords)) {
+      maxRisk = Math.max(maxRisk, poly.risk);
+    }
+  }
+  return maxRisk;
+}
+
+function pointInPolygon(lat, lng, coords) {
+  // Algorithme ray casting
+  let inside = false;
+  const n = coords.length;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const yi = coords[i][0], xi = coords[i][1];
+    const yj = coords[j][0], xj = coords[j][1];
+    if (((yi > lat) !== (yj > lat)) &&
+        (lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function showPositionResult(lat, lng, risk, cfg) {
+  const panel = document.getElementById('positionResult');
+  const icon  = document.getElementById('resIcon');
+  const title = document.getElementById('resTitle');
+  const body  = document.getElementById('resBody');
+  const coords = document.getElementById('resCoords');
+
+  panel.className = 'position-result risk-' + risk;
+
+  if (risk === 0) {
+    icon.textContent   = '✅';
+    title.textContent  = 'Zone Sécurisée';
+    title.className    = 'result-title safe';
+    body.textContent   = 'Votre position ne se trouve dans aucune zone d\'inondation détectée actuellement.';
+  } else {
+    icon.textContent   = cfg.emoji;
+    title.textContent  = `Alerte — Niveau ${cfg.label}`;
+    title.className    = 'result-title ' + cfg.titleClass;
+    body.innerHTML     = `Vous vous trouvez dans une zone d'inondation classifiée 
+      <strong style="color:${cfg.color};">${cfg.label}</strong>.
+      Restez prudent et suivez les consignes officielles.`;
+  }
+
+  coords.textContent = `📍 ${lat.toFixed(5)}°N, ${lng.toFixed(5)}°E`;
+  panel.style.display = 'block';
+}
+
+function closePositionResult() {
+  document.getElementById('positionResult').style.display = 'none';
+}
+
+// ── Archive historique ────────────────────────────────────────────────────────
+document.getElementById('btnLoadArchive').addEventListener('click', () => {
+  const season = document.getElementById('archiveSeason').value;
+  const dateVal = document.getElementById('archiveDate').value;
+  const key = dateVal
+    ? dateVal.slice(0, 7) // "YYYY-MM"
+    : season;
+
+  if (DEMO_FLOOD_DATA[key]) {
+    renderFloodData(key);
+    showToast(`🛰️ Analyse satellite chargée : ${DEMO_FLOOD_DATA[key].date}`, 'success');
+  } else {
+    showToast('⚠️ Aucune donnée disponible pour cette période.', 'warning');
+  }
+});
+
+// ── Formulaire Inscription ────────────────────────────────────────────────────
+function handleSubscribe(e) {
+  e.preventDefault();
+  const name  = document.getElementById('subName').value.trim();
+  const city  = document.getElementById('subCity').value.trim();
+  const phone = document.getElementById('subPhone').value.trim();
+  const email = document.getElementById('subEmail').value.trim();
+
+  if (!phone && !email) {
+    showToast('⚠️ Veuillez saisir un téléphone ou un email.', 'warning');
+    return false;
+  }
+
+  // Ici : appel à Firebase Cloud Functions registerSubscriber
+  console.log('📝 Inscription :', { name, city, phone, email });
+  showToast(`✅ ${name}, vous êtes inscrit(e) aux alertes pour ${city} !`, 'success');
+  e.target.reset();
+  return false;
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(message, type = 'success') {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `<span>${message}</span>`;
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity .3s';
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
+
+// ── Loading ───────────────────────────────────────────────────────────────────
+function showLoading(show) {
+  document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+}
+
+// ── Bascule Side Panel ────────────────────────────────────────────────────────
+document.getElementById('btnTogglePanel').addEventListener('click', () => {
+  document.getElementById('sidePanel').classList.toggle('open');
+});
+
+document.getElementById('btnMyPosition').addEventListener('click', handleMyPosition);
+
+document.getElementById('btnOpenSubscribe').addEventListener('click', () => {
+  document.getElementById('subscribeSection').scrollIntoView({ behavior: 'smooth' });
+  if (window.innerWidth <= 768) {
+    document.getElementById('sidePanel').classList.add('open');
+  }
+});
+
+// ── Initialisation ────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  renderFloodData('2024-10');
+});
+</script>
+
+</body>
+</html>
