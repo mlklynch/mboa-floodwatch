@@ -1,15 +1,31 @@
 import ee
 import firebase_admin
+import json
 from firebase_admin import credentials, firestore
 
-# 1. Initialisation GEE & Firebase
-# Le fichier serviceAccountKey.json doit être présent dans le dossier backend/gee/
-cred = credentials.Certificate("serviceAccountKey.json")
-firebase_admin.initialize_app(cred)
-db = firestore.client()
+# 1. Chargement des credentials pour GEE et Firebase
+# Le fichier serviceAccountKey.json doit être présent à la racine lors de l'exécution
+service_account_file = "serviceAccountKey.json"
 
-# Initialisation de GEE avec l'ID du projet configuré
-ee.Initialize(project='mboa-floodwatch-5227b')
+try:
+    with open(service_account_file) as f:
+        info = json.load(f)
+
+    # INITIALISATION GEE (Authentification automatisée)
+    # On utilise ee.ServiceAccountCredentials pour éviter le "earthengine authenticate" manuel
+    geb_credentials = ee.ServiceAccountCredentials(info['client_email'], service_account_file)
+    ee.Initialize(credentials=geb_credentials, project='mboa-floodwatch-5227b')
+    print("✅ Authentification Google Earth Engine réussie.")
+
+    # INITIALISATION FIREBASE
+    cred = credentials.Certificate(service_account_file)
+    firebase_admin.initialize_app(cred)
+    db = firestore.client()
+    print("✅ Authentification Firebase réussie.")
+
+except Exception as e:
+    print(f"❌ Erreur lors de l'initialisation des services : {e}")
+    exit(1)
 
 def run_analysis(region_coords, before_date, after_date):
     """Effectue l'analyse radar et envoie les résultats à Firestore."""
@@ -28,8 +44,7 @@ def run_analysis(region_coords, before_date, after_date):
     # Détection des changements (Seuil d'eau)
     diff = after.divide(before)
     
-    # CORRECTION : Sélection d'une seule bande et application du masque
-    # selfMask() permet de ne traiter que les pixels inondés (valeur 1)
+    # Sélection d'une seule bande et application du masque
     flood_mask = diff.select([0]).gt(1.25).selfMask().clip(area)
     
     # Conversion en polygones
@@ -42,11 +57,10 @@ def run_analysis(region_coords, before_date, after_date):
     )
 
     # FILTRE : Suppression du bruit radar (on garde les zones > 10 pixels)
-    # Cela évite l'erreur "Collection query aborted after accumulating over 5000 elements"
     filtered_vectors = vectors.filter(ee.Filter.gt('count', 10))
     features = filtered_vectors.getInfo()['features']
     
-    # Envoi vers Firestore via un Batch pour optimiser les performances
+    # Envoi vers Firestore via un Batch
     doc_id = after_date[0]
     batch = db.batch()
     doc_ref = db.collection('flood_events').document(doc_id)
@@ -54,20 +68,20 @@ def run_analysis(region_coords, before_date, after_date):
     batch.set(doc_ref, {
         'after_date': doc_id,
         'region': "Cameroun",
-        'status': "active"
+        'status': "active",
+        'last_update': firestore.SERVER_TIMESTAMP
     })
     
-    for i, feat in enumerate(features):
+    # Limiter à 400 polygones par batch pour respecter les limites Firestore si nécessaire
+    for i, feat in enumerate(features[:400]): 
         poly_ref = doc_ref.collection('polygons').document(f"poly_{i}")
         batch.set(poly_ref, {
-            'geometry': str(feat['geometry']),
+            'geometry': json.dumps(feat['geometry']), # JSON string pour Leaflet
             'risk_level': 3
         })
     
     batch.commit()
-    print(f"✅ Analyse terminée. {len(features)} zones détectées et envoyées à Firestore.")
-
-# --- DÉCLENCHEUR D'ANALYSE ---
+    print(f"✅ Analyse terminée. {len(features[:400])} zones détectées et envoyées à Firestore.")
 
 if __name__ == "__main__":
     # Zone d'étude : Littoral (Douala/Edea)
