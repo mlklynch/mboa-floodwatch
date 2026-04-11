@@ -1,0 +1,122 @@
+/* ═══════════════════════════════════════════════════
+   MBOA-FLOODWATCH — Global Reset & Base Styles
+   ═══════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Space+Mono:wght@400;700&display=swap');
+
+:root {
+  /* Cameroun National Palette */
+  --green:       #007A5E;
+  --green-light: #00A87D;
+  --green-dark:  #005944;
+  --red:         #CE1126;
+  --red-light:   #FF2E4A;
+  --yellow:      #FCD116;
+  --yellow-dark: #E8BE00;
+
+  /* Neutrals */
+  --white:       #FFFFFF;
+  --gray-50:     #F8F9FA;
+  --gray-100:    #F0F1F2;
+  --gray-200:    #DDE0E4;
+  --gray-400:    #9CA3AF;
+  --gray-600:    #4B5563;
+  --gray-900:    #111827;
+
+  /* Shadows */
+  --shadow-sm:   0 2px 8px rgba(0,0,0,.08);
+  --shadow-md:   0 8px 32px rgba(0,0,0,.14);
+  --shadow-lg:   0 20px 60px rgba(0,0,0,.2);
+
+  /* Radius */
+  --radius-sm:   8px;
+  --radius-md:   16px;
+  --radius-lg:   24px;
+
+  /* Typography */
+  --font-main:   'Sora', system-ui, sans-serif;
+  --font-mono:   'Space Mono', ui-monospace, monospace;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font-main);
+  background: var(--gray-50);
+  color: var(--gray-900);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  text-align: left;
+  border: none;
+  display: flex;
+  flex-direction: column;
+}
+
+a {
+  color: var(--green);
+  text-decoration: none;
+}
+
+button {
+  font-family: var(--font-main);
+  cursor: pointer;
+}
+
+input, select, textarea {
+  font-family: var(--font-main);
+}
+
+/* ── Scrollbar Styling ─────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--gray-100);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--gray-400);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-600);
+}
+
+/* ── Utility Animations ────────────────────────────── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .6; transform: scale(1.4); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes wave {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
