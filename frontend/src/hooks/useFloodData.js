@@ -79,11 +79,11 @@ export default function useFloodData() {
     loadPolygons(selectedEventId);
   }, [selectedEventId, loadPolygons]);
 
-  // Compute stats from current polygons
+  // Compute stats from current polygons (coerce risk_level to number for Firestore compatibility)
   const stats = {
-    critique:  polygons.filter((p) => p.risk_level === 3).length,
-    alerte:    polygons.filter((p) => p.risk_level === 2).length,
-    vigilance: polygons.filter((p) => p.risk_level === 1).length,
+    critique:  polygons.filter((p) => Number(p.risk_level) === 3).length,
+    alerte:    polygons.filter((p) => Number(p.risk_level) === 2).length,
+    vigilance: polygons.filter((p) => Number(p.risk_level) === 1).length,
     total:     polygons.length,
   };
 

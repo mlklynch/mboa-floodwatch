@@ -20,7 +20,7 @@ function getRiskForPoint(lat, lng, polygons) {
         : poly.geometry;
       const turfPoly = turf.feature(geometry);
       if (turf.booleanPointInPolygon(point, turfPoly)) {
-        maxRisk = Math.max(maxRisk, poly.risk_level || 0);
+        maxRisk = Math.max(maxRisk, Number(poly.risk_level) || 0);
       }
     } catch {
       // Skip malformed polygons
