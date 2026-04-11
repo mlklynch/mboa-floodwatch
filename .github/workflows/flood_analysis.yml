@@ -25,8 +25,15 @@ jobs:
 
       - name: Create Auth Files
         run: |
-          echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > serviceAccountKey.json
-          echo "${{ secrets.ENV_FILE }}" > .env
+          # Utilisation de Heredoc pour éviter les erreurs de formatage JSON
+          cat <<EOF > serviceAccountKey.json
+          ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          EOF
+          
+          cat <<EOF > .env
+          ${{ secrets.ENV_FILE }}
+          EOF
 
       - name: Run Flood Detection
+        # On s'assure que le chemin vers le script est correct par rapport à la racine
         run: python backend/gee/detection_radar.py
