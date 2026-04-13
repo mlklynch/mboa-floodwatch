@@ -84,11 +84,13 @@ export default function MboaMap({
           weight: style.weight,
         },
         onEachFeature: (feature, lyr) => {
+          const regionInfo = poly.region ? `<p style="font-size:12px;font-weight:600;margin:2px 0;">${poly.region}${poly.ville ? ` — ${poly.ville}` : ""}</p>` : "";
           lyr.bindPopup(`
             <div class="mboa-popup">
               <span class="popup-badge" style="background:${style.fillColor}">
                 ${style.label}
               </span>
+              ${regionInfo}
               <p><strong>Niveau : ${style.label}</strong></p>
               <p style="font-size:12px;color:#666;">Detecte par Sentinel-1 SAR</p>
             </div>

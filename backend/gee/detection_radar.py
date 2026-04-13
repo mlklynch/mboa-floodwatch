@@ -31,23 +31,57 @@ RISK_THRESHOLDS = {
 # Surface minimum en pixels pour filtrer le bruit radar
 MIN_PIXEL_COUNT = 10
 
-# Zones d'etude predefinies au Cameroun
+# Zones d'etude predefinies — 10 Regions du Cameroun
 ZONES_CAMEROUN = {
-    "littoral": {
-        "name": "Cameroun - Littoral (Douala/Edea)",
-        "coords": [[9.5, 3.8], [9.9, 3.8], [9.9, 4.2], [9.5, 4.2], [9.5, 3.8]],
+    "adamaoua": {
+        "name": "Cameroun - Adamaoua (Ngaoundere/Meiganga/Tibati)",
+        "coords": [[11.5, 6.0], [14.5, 6.0], [14.5, 7.8], [11.5, 7.8], [11.5, 6.0]],
+        "villes": ["Ngaoundere", "Meiganga", "Tibati", "Banyo", "Tignere"],
+    },
+    "centre": {
+        "name": "Cameroun - Centre (Yaounde/Mbalmayo/Obala)",
+        "coords": [[10.5, 3.3], [12.5, 3.3], [12.5, 4.8], [10.5, 4.8], [10.5, 3.3]],
+        "villes": ["Yaounde", "Mbalmayo", "Obala", "Nanga-Eboko", "Eseka", "Monatele"],
+    },
+    "est": {
+        "name": "Cameroun - Est (Bertoua/Batouri/Yokadouma)",
+        "coords": [[13.0, 2.0], [16.0, 2.0], [16.0, 5.0], [13.0, 5.0], [13.0, 2.0]],
+        "villes": ["Bertoua", "Batouri", "Yokadouma", "Abong-Mbang", "Belabo", "Moloundou"],
     },
     "extreme_nord": {
-        "name": "Cameroun - Extreme-Nord (Maroua/Logone)",
-        "coords": [[14.0, 10.2], [15.5, 10.2], [15.5, 11.5], [14.0, 11.5], [14.0, 10.2]],
+        "name": "Cameroun - Extreme-Nord (Maroua/Kousseri/Mokolo)",
+        "coords": [[14.0, 10.0], [15.5, 10.0], [15.5, 12.5], [14.0, 12.5], [14.0, 10.0]],
+        "villes": ["Maroua", "Kousseri", "Mokolo", "Mora", "Yagoua", "Kaele"],
+    },
+    "littoral": {
+        "name": "Cameroun - Littoral (Douala/Edea/Nkongsamba)",
+        "coords": [[9.4, 3.6], [10.3, 3.6], [10.3, 5.0], [9.4, 5.0], [9.4, 3.6]],
+        "villes": ["Douala", "Edea", "Nkongsamba", "Manjo"],
     },
     "nord": {
-        "name": "Cameroun - Nord (Garoua/Benoue)",
-        "coords": [[13.0, 8.8], [14.0, 8.8], [14.0, 9.8], [13.0, 9.8], [13.0, 8.8]],
+        "name": "Cameroun - Nord (Garoua/Guider/Lagdo)",
+        "coords": [[13.0, 8.0], [14.5, 8.0], [14.5, 10.0], [13.0, 10.0], [13.0, 8.0]],
+        "villes": ["Garoua", "Guider", "Poli", "Tchollire", "Lagdo"],
+    },
+    "nord_ouest": {
+        "name": "Cameroun - Nord-Ouest (Bamenda/Kumbo/Wum)",
+        "coords": [[9.8, 5.8], [10.8, 5.8], [10.8, 6.5], [9.8, 6.5], [9.8, 5.8]],
+        "villes": ["Bamenda", "Kumbo", "Wum", "Ndop", "Fundong"],
+    },
+    "ouest": {
+        "name": "Cameroun - Ouest (Bafoussam/Dschang/Foumban)",
+        "coords": [[9.9, 5.0], [11.0, 5.0], [11.0, 5.8], [9.9, 5.8], [9.9, 5.0]],
+        "villes": ["Bafoussam", "Dschang", "Foumban", "Mbouda", "Bangangte", "Foumbot"],
+    },
+    "sud": {
+        "name": "Cameroun - Sud (Ebolowa/Kribi/Sangmelima)",
+        "coords": [[9.7, 2.0], [12.2, 2.0], [12.2, 3.2], [9.7, 3.2], [9.7, 2.0]],
+        "villes": ["Ebolowa", "Kribi", "Sangmelima", "Ambam", "Campo"],
     },
     "sud_ouest": {
-        "name": "Cameroun - Sud-Ouest (Limbe/Buea)",
-        "coords": [[8.9, 3.9], [9.4, 3.9], [9.4, 4.3], [8.9, 4.3], [8.9, 3.9]],
+        "name": "Cameroun - Sud-Ouest (Buea/Limbe/Kumba)",
+        "coords": [[8.9, 3.9], [9.6, 3.9], [9.6, 5.9], [8.9, 5.9], [8.9, 3.9]],
+        "villes": ["Buea", "Limbe", "Kumba", "Mamfe", "Tiko", "Mudemba"],
     },
 }
 
@@ -274,6 +308,39 @@ def run_flood_detection_pipeline(
 
 # ─── Point d'Entree ──────────────────────────────────────────────────────────
 
+def run_all_regions(before_start, before_end, after_start, after_end):
+    """
+    Execute le pipeline de detection pour les 10 regions du Cameroun.
+    Permet une couverture nationale complete.
+    """
+    print(f"\n{'='*60}")
+    print(f"  ANALYSE NATIONALE — 10 REGIONS DU CAMEROUN")
+    print(f"  Periode : {before_start} -> {after_end}")
+    print(f"{'='*60}\n")
+
+    results = {}
+    for zone_key in ZONES_CAMEROUN:
+        try:
+            polys = run_flood_detection_pipeline(
+                before_start=before_start,
+                before_end=before_end,
+                after_start=after_start,
+                after_end=after_end,
+                zone_key=zone_key,
+            )
+            results[zone_key] = polys or []
+            print(f"[OK] {zone_key} : {len(results[zone_key])} zones detectees")
+        except Exception as e:
+            print(f"[ERREUR] {zone_key} : {e}")
+            results[zone_key] = []
+
+    total = sum(len(v) for v in results.values())
+    print(f"\n{'='*60}")
+    print(f"  TOTAL NATIONAL : {total} zones d'inondation detectees")
+    print(f"{'='*60}\n")
+    return results
+
+
 if __name__ == "__main__":
     print("\n  MBOA-FLOODWATCH")
     print("  Pipeline Sentinel-1 SAR -> Firestore\n")
@@ -281,12 +348,12 @@ if __name__ == "__main__":
     initialize_services()
 
     try:
-        run_flood_detection_pipeline(
+        # Analyse nationale — toutes les 10 regions
+        run_all_regions(
             before_start="2026-03-01",
             before_end="2026-03-20",
             after_start="2026-04-01",
             after_end="2026-04-11",
-            zone_key="littoral",
         )
     except Exception as e:
         print(f"[ERREUR CRITIQUE] {e}")
