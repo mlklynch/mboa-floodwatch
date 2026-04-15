@@ -31,25 +31,79 @@ RISK_THRESHOLDS = {
 # Surface minimum en pixels pour filtrer le bruit radar
 MIN_PIXEL_COUNT = 10
 
-# Zones d'etude predefinies au Cameroun
-ZONES_CAMEROUN = {
-    "littoral": {
-        "name": "Cameroun - Littoral (Douala/Edea)",
-        "coords": [[9.5, 3.8], [9.9, 3.8], [9.9, 4.2], [9.5, 4.2], [9.5, 3.8]],
+# Chefs-lieux du Cameroun avec leurs coordonnees et zones tampon (30km)
+CHEFS_LIEUX_CAMEROUN = [
+    {
+        "name": "Yaoundé",
+        "region": "Centre",
+        "lat": 3.8667,
+        "lon": 11.5167,
+        "buffer_km": 30,
     },
-    "extreme_nord": {
-        "name": "Cameroun - Extreme-Nord (Maroua/Logone)",
-        "coords": [[14.0, 10.2], [15.5, 10.2], [15.5, 11.5], [14.0, 11.5], [14.0, 10.2]],
+    {
+        "name": "Douala",
+        "region": "Littoral",
+        "lat": 4.0511,
+        "lon": 9.7679,
+        "buffer_km": 30,
     },
-    "nord": {
-        "name": "Cameroun - Nord (Garoua/Benoue)",
-        "coords": [[13.0, 8.8], [14.0, 8.8], [14.0, 9.8], [13.0, 9.8], [13.0, 8.8]],
+    {
+        "name": "Bamenda",
+        "region": "Nord-Ouest",
+        "lat": 5.9631,
+        "lon": 10.1591,
+        "buffer_km": 30,
     },
-    "sud_ouest": {
-        "name": "Cameroun - Sud-Ouest (Limbe/Buea)",
-        "coords": [[8.9, 3.9], [9.4, 3.9], [9.4, 4.3], [8.9, 4.3], [8.9, 3.9]],
+    {
+        "name": "Buea",
+        "region": "Sud-Ouest",
+        "lat": 4.1578,
+        "lon": 9.2414,
+        "buffer_km": 30,
     },
-}
+    {
+        "name": "Limbé",
+        "region": "Sud-Ouest",
+        "lat": 4.0186,
+        "lon": 9.1386,
+        "buffer_km": 30,
+    },
+    {
+        "name": "Garoua",
+        "region": "Nord",
+        "lat": 9.3022,
+        "lon": 13.3968,
+        "buffer_km": 30,
+    },
+    {
+        "name": "Maroua",
+        "region": "Extrême-Nord",
+        "lat": 10.5903,
+        "lon": 14.3116,
+        "buffer_km": 30,
+    },
+    {
+        "name": "Bafoussam",
+        "region": "Ouest",
+        "lat": 5.7679,
+        "lon": 10.4167,
+        "buffer_km": 30,
+    },
+    {
+        "name": "Edéa",
+        "region": "Littoral",
+        "lat": 3.8,
+        "lon": 10.1333,
+        "buffer_km": 30,
+    },
+    {
+        "name": "Kumba",
+        "region": "Sud-Ouest",
+        "lat": 4.6333,
+        "lon": 9.45,
+        "buffer_km": 30,
+    },
+]
 
 # ─── Initialisation des Services ─────────────────────────────────────────────
 
@@ -83,6 +137,23 @@ def initialize_services():
 
 
 # ─── Pipeline de Detection ───────────────────────────────────────────────────
+
+def get_buffer_coordinates(lat, lon, buffer_km=30):
+    """
+    Genere un carre de coordonnees [lon, lat] centré sur le point
+    avec une zone tampon de buffer_km km.
+    """
+    lat_offset = (buffer_km / 111.0)  # 1 degre ≈ 111 km
+    lon_offset = (buffer_km / (111.0 * math.cos(math.radians(lat))))
+
+    return [
+        [lon - lon_offset, lat - lat_offset],
+        [lon + lon_offset, lat - lat_offset],
+        [lon + lon_offset, lat + lat_offset],
+        [lon - lon_offset, lat + lat_offset],
+        [lon - lon_offset, lat - lat_offset],
+    ]
+
 
 def apply_speckle_filter(image):
     """Applique un filtre de reduction du bruit speckle (focal median 3x3)."""
@@ -143,13 +214,13 @@ def run_flood_detection_pipeline(
         zone_key:      Cle d'une zone predefinie (ex: 'littoral')
     """
     # Resoudre la zone d'etude
-    if zone_key and zone_key in ZONES_CAMEROUN:
-        zone = ZONES_CAMEROUN[zone_key]
+    if zone_key and zone_key in ZONES_CAMEROUN: # type: ignore
+        zone = ZONES_CAMEROUN[zone_key] # type: ignore
         region_coords = zone["coords"]
         region_name = zone["name"]
     elif region_coords is None:
-        region_coords = ZONES_CAMEROUN["littoral"]["coords"]
-        region_name = ZONES_CAMEROUN["littoral"]["name"]
+        region_coords = ZONES_CAMEROUN["littoral"]["coords"] # type: ignore
+        region_name = ZONES_CAMEROUN["littoral"]["name"] # type: ignore
 
     area = ee.Geometry.Polygon(region_coords)
 
@@ -242,51 +313,136 @@ def run_flood_detection_pipeline(
         print("[AVERTISSEMENT] Firebase non initialise. Resultats non envoyes.")
         return classified_polygons
 
-    event_id = f"event_{after_start.replace('-', '')}"
+    # Envoyer les polygones directement dans la collection 'polygons'
+    # avec le nom de la ville et de la region
     batch = db.batch()
-    doc_ref = db.collection("flood_events").document(event_id)
+    batch_count = 0
 
-    batch.set(doc_ref, {
-        "before_date": before_start,
-        "after_date": after_start,
-        "region": region_name,
-        "status": "active",
-        "feature_count": len(classified_polygons),
-        "created_at": firestore.SERVER_TIMESTAMP,
-    })
+    for i, poly_data in enumerate(classified_polygons):
+        # Utiliser un ID unique basé sur la timestamp et l'index
+        doc_id = f"{region_name}_{after_start}_{i}_{int(datetime.utcnow().timestamp())}"
+        poly_ref = db.collection("polygons").document(doc_id)
 
-    # Limiter a 400 polygones par batch (limite Firestore: 500 ops)
-    for i, poly_data in enumerate(classified_polygons[:400]):
-        poly_ref = doc_ref.collection("polygons").document(f"poly_{i}")
         batch.set(poly_ref, {
             "geometry": poly_data["geometry"],
             "risk_level": poly_data["risk_level"],
             "risk_label": poly_data["risk_label"],
             "area_m2": poly_data["area_m2"],
-            "event_id": event_id,
+            "pixel_count": poly_data["pixel_count"],
+            "region_name": region_name,  # Nom de la ville/region
             "analyzed_at": poly_data["analyzed_at"],
+            "created_at": firestore.SERVER_TIMESTAMP,
         })
 
-    batch.commit()
-    print(f"[OK] {len(classified_polygons[:400])} zones envoyees a Firestore (event: {event_id}).")
+        batch_count += 1
+
+        # Firestore limite a 500 operations par batch
+        if batch_count >= 400:
+            batch.commit()
+            print(f"[OK] {batch_count} polygones envoyes a Firestore.")
+            batch = db.batch()
+            batch_count = 0
+
+    # Commit final
+    if batch_count > 0:
+        batch.commit()
+        print(f"[OK] {batch_count} polygones envoyes a Firestore (final batch).")
+
     return classified_polygons
 
 
 # ─── Point d'Entree ──────────────────────────────────────────────────────────
 
+def run_analysis_all_chefs_lieux(before_start, before_end, after_start, after_end):
+    """
+    Lance l'analyse de detection d'inondations pour tous les 10 chefs-lieux
+    du Cameroun.
+
+    Args:
+        before_start: Date debut de la periode 'avant' (ex: '2026-08-01')
+        before_end:   Date fin de la periode 'avant' (ex: '2026-09-15')
+        after_start:  Date debut de la periode 'apres' (ex: '2026-10-01')
+        after_end:    Date fin de la periode 'apres' (ex: '2026-10-31')
+    """
+    print("\n" + "="*70)
+    print("  ANALYSE SIMULTANEE - 10 CHEFS-LIEUX DU CAMEROUN")
+    print("="*70)
+
+    all_results = {}
+    total_polygons = 0
+
+    for chef_lieu in CHEFS_LIEUX_CAMEROUN:
+        name = chef_lieu["name"]
+        region = chef_lieu["region"]
+        lat = chef_lieu["lat"]
+        lon = chef_lieu["lon"]
+        buffer_km = chef_lieu["buffer_km"]
+
+        # Generer les coordonnees de la zone tampon
+        coords = get_buffer_coordinates(lat, lon, buffer_km)
+        region_name = f"{name} ({region})"
+
+        print(f"\n  -> Analyse en cours : {region_name}...")
+
+        try:
+            results = run_flood_detection_pipeline(
+                before_start=before_start,
+                before_end=before_end,
+                after_start=after_start,
+                after_end=after_end,
+                region_coords=coords,
+                region_name=region_name,
+            )
+
+            all_results[name] = {
+                "region": region,
+                "polygon_count": len(results),
+                "status": "success",
+            }
+
+            total_polygons += len(results)
+
+        except Exception as e:
+            print(f"  [ERREUR] {region_name} : {e}")
+            all_results[name] = {
+                "region": region,
+                "polygon_count": 0,
+                "status": "error",
+                "error": str(e),
+            }
+
+    # Resumé final
+    print("\n" + "="*70)
+    print("  RESUME FINAL - ANALYSE COMPLETES")
+    print("="*70)
+
+    for name, data in all_results.items():
+        status_icon = "✓" if data["status"] == "success" else "✗"
+        print(
+            f"  {status_icon} {name:20} ({data['region']:15}) : "
+            f"{data['polygon_count']} polygone(s)"
+        )
+
+    print(f"\n  Total : {total_polygons} polygones envoyes a Firestore")
+    print("="*70 + "\n")
+
+    return all_results
+
+
 if __name__ == "__main__":
     print("\n  MBOA-FLOODWATCH")
-    print("  Pipeline Sentinel-1 SAR -> Firestore\n")
+    print("  Pipeline Sentinel-1 SAR -> Firestore")
+    print("  Detection d'inondations sur 10 chefs-lieux\n")
 
     initialize_services()
 
     try:
-        run_flood_detection_pipeline(
+        # Parametres de l'analyse (A adapter selon votre cas d'usage)
+        run_analysis_all_chefs_lieux(
             before_start="2026-03-01",
             before_end="2026-03-20",
             after_start="2026-04-01",
             after_end="2026-04-11",
-            zone_key="littoral",
         )
     except Exception as e:
         print(f"[ERREUR CRITIQUE] {e}")
