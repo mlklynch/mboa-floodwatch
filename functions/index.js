@@ -147,6 +147,48 @@ exports.onNewFloodEvent = functions.firestore
     return Promise.all(notifications);
   });
 
+// ─── PLANIFICATEUR : MISE A JOUR QUOTIDIENNE DES DATES D'ÉVÉNEMENT ─────────────
+
+exports.dailyRefreshEventDates = functions.pubsub
+  .schedule("0 1 * * *")
+  .timeZone("Africa/Douala")
+  .onRun(async (context) => {
+    const today = new Date().toISOString().split("T")[0];
+    functions.logger.info(`Daily event refresh started for ${today}`);
+
+    const snapshot = await db.collection("flood_events")
+      .where("status", "==", "active")
+      .get();
+
+    if (snapshot.empty) {
+      functions.logger.info("Aucun événement actif trouvé pour la mise à jour quotidienne.");
+      return null;
+    }
+
+    const batch = db.batch();
+    let updateCount = 0;
+
+    snapshot.docs.forEach((doc) => {
+      const existingDate = doc.data().after_date;
+      if (existingDate !== today) {
+        batch.update(doc.ref, {
+          after_date: today,
+          updated_at: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        updateCount += 1;
+      }
+    });
+
+    if (updateCount > 0) {
+      await batch.commit();
+      functions.logger.info(`${updateCount} événement(s) actif(s) mis à jour avec la date ${today}.`);
+    } else {
+      functions.logger.info("Aucun événement actif n'avait besoin de mise à jour.");
+    }
+
+    return null;
+  });
+
 // ─── APPEL HTTPS : INSCRIPTION ────────────────────────────────────────────────
 
 exports.registerSubscriber = functions.https.onCall(async (data, context) => {

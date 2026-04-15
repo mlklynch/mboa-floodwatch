@@ -5,7 +5,7 @@
 
 import React from "react";
 
-export default function Navbar({ onSubscribeClick }) {
+export default function Navbar({ user, onSubscribeClick }) {
   return (
     <nav className="navbar">
       <a href="/" className="navbar-brand">
@@ -35,18 +35,19 @@ export default function Navbar({ onSubscribeClick }) {
           <span className="status-dot" />
           Sentinel-1 Actif
         </div>
+        {user && (
+          <div className="navbar-greeting">
+            Bienvenue, <strong>{user.name}</strong>
+          </div>
+        )}
       </div>
 
       <div className="navbar-actions">
-        <button
-          className="btn-nav btn-nav-ghost"
-          onClick={() => window.open("https://github.com/mlklynch/mboa-floodwatch", "_blank")}
-        >
-          GitHub
-        </button>
-        <button className="btn-nav btn-nav-yellow" onClick={onSubscribeClick}>
-          S&apos;inscrire aux Alertes
-        </button>
+        {!user && (
+          <button className="btn-nav btn-nav-yellow" onClick={onSubscribeClick}>
+            S&apos;inscrire aux Alertes
+          </button>
+        )}
       </div>
     </nav>
   );

@@ -6,8 +6,19 @@
 import React from "react";
 
 export default function ArchiveSelector({ events, selectedEventId, onSelectEvent, loading }) {
+  const todayLabel = new Date().toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
   return (
     <div className="archive-selector">
+      <div className="archive-header">
+        <span className="archive-today-label">Données satellitaires du jour</span>
+        <span className="archive-today-date">{todayLabel}</span>
+      </div>
       <label htmlFor="event-select">Saison / Periode</label>
       <select
         id="event-select"

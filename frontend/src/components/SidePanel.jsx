@@ -7,8 +7,10 @@ import React from "react";
 import StatsGrid from "./StatsGrid";
 import ArchiveSelector from "./ArchiveSelector";
 import SubscribeForm from "./SubscribeForm";
+import LoginForm from "./LoginForm";
 
 export default function SidePanel({
+  user,
   stats,
   events,
   selectedEventId,
@@ -16,6 +18,8 @@ export default function SidePanel({
   loading,
   isDemo,
   onToast,
+  onAuthenticated,
+  onLogout,
 }) {
   return (
     <aside className="side-panel">
@@ -53,16 +57,41 @@ export default function SidePanel({
         />
       </div>
 
-      {/* Subscribe Form (F3) */}
-      <div className="panel-section">
-        <div className="section-title">
-          Recevoir les Alertes
+      {user ? (
+        <div className="panel-section">
+          <div className="section-title">Mon Compte</div>
+          <p className="user-welcome">
+            Bonjour {user.name}, vous etes connecte(e) et recevez des alertes.
+          </p>
+          <div className="user-details">
+            <p><strong>Ville :</strong> {user.city}</p>
+            {user.phone && <p><strong>Téléphone :</strong> {user.phone}</p>}
+            {user.email && <p><strong>Email :</strong> {user.email}</p>}
+          </div>
+          <button className="btn-logout" onClick={onLogout}>
+            Déconnexion
+          </button>
         </div>
-        <SubscribeForm
-          onSuccess={(msg) => onToast(msg, "success")}
-          onError={(msg) => onToast(msg, "error")}
-        />
-      </div>
+      ) : (
+        <>
+          <div className="panel-section">
+            <div className="section-title">Connexion</div>
+            <LoginForm
+              onSuccess={(msg) => onToast(msg, "success")}
+              onError={(msg) => onToast(msg, "error")}
+              onAuthenticated={onAuthenticated}
+            />
+          </div>
+          <div className="panel-section">
+            <div className="section-title">S'inscrire aux alertes</div>
+            <SubscribeForm
+              onSuccess={(msg) => onToast(msg, "success")}
+              onError={(msg) => onToast(msg, "error")}
+              onRegistered={onAuthenticated}
+            />
+          </div>
+        </>
+      )}
     </aside>
   );
 }

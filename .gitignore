@@ -74,3 +74,17 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+GUIDE_DEPLOIEMENT.md
+backend/gee/check_polygons.py
+backend/gee/check_regions.py
+backend/gee/check_specific_regions.py
+backend/gee/check_yaounde_ebolowa.py
+backend/gee/detection_radar.py
+frontend/index.html
+frontend/src/components/Navbar.jsx
+frontend/src/services/floodService.js
+GUIDE_DEPLOIEMENT.md
+backend/gee/detection_radar.py
+frontend/index.html
+frontend/src/components/Navbar.jsx
+frontend/src/services/floodService.js

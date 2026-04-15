@@ -27,30 +27,109 @@ export const CAMEROON_ZOOM = 6;
 // ─── FLOOD EVENTS ───────────────────────────────────────────────────────────
 
 /**
- * Fetch all flood events from Firestore, sorted by after_date descending.
+ * Fetch all flood events from Firestore.
+ * First tries flood_events collection, then creates events from regions in polygons collection.
  */
 export async function fetchFloodEvents() {
   try {
+    // Try to fetch actual flood_events collection
     const q = query(collection(db, "flood_events"), orderBy("after_date", "desc"));
     const snap = await getDocs(q);
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    if (snap.docs.length > 0) {
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    }
   } catch (err) {
-    console.warn("fetchFloodEvents fallback (no orderBy index):", err.message);
-    const snap = await getDocs(collection(db, "flood_events"));
-    const events = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    console.warn("flood_events collection not available, trying polygons fallback:", err.message);
+  }
+
+  // Fallback: Create events from unique regions in polygons collection
+  try {
+    const snap = await getDocs(collection(db, "polygons"));
+    const polygons = snap.docs.map((d) => d.data());
+    
+    // Extract unique regions
+    const regionMap = {};
+    polygons.forEach((poly) => {
+      const region = poly.region_name || "Cameroun";
+      if (!regionMap[region]) {
+        regionMap[region] = {
+          count: 0,
+          analyzed_at: poly.analyzed_at || poly.created_at,
+        };
+      }
+      regionMap[region].count += 1;
+    });
+
+    // Convert to event format
+    const events = Object.entries(regionMap).map(([region, data]) => ({
+      id: region.replace(/\s+/g, "_").toLowerCase(),
+      region,
+      after_date: data.analyzed_at || new Date().toISOString().split("T")[0],
+      status: "active",
+      feature_count: data.count,
+    }));
+
+    // Sort by analyzed_at descending
     events.sort((a, b) => (b.after_date || "").localeCompare(a.after_date || ""));
+    
     return events;
+  } catch (err) {
+    console.error("Error fetching polygons for events:", err);
+    return [];
   }
 }
 
 /**
- * Fetch polygons sub-collection for a given flood event.
+ * Fetch polygons for a given region/event.
+ * First tries flood_events sub-collection, then filters polygons by region_name.
  */
 export async function fetchEventPolygons(eventId) {
-  const snap = await getDocs(
-    collection(db, "flood_events", eventId, "polygons")
-  );
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  try {
+    // Try to fetch from flood_events sub-collection
+    const snap = await getDocs(
+      collection(db, "flood_events", eventId, "polygons")
+    );
+    if (snap.docs.length > 0) {
+      return snap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+        geometry: typeof d.data().geometry === "string" 
+          ? JSON.parse(d.data().geometry) 
+          : d.data().geometry,
+      }));
+    }
+  } catch (err) {
+    console.warn(`No sub-collection found for ${eventId}, trying region filter:`, err.message);
+  }
+
+  // Fallback: Filter polygons by region_name
+  try {
+    // Decode region from eventId (region names are lowercased/underscored)
+    // We need to fetch all and filter since we don't know the exact region name
+    const snap = await getDocs(collection(db, "polygons"));
+    const allPolygons = snap.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+      geometry: typeof d.data().geometry === "string" 
+        ? JSON.parse(d.data().geometry) 
+        : d.data().geometry,
+    }));
+
+    // If eventId looks like a region key, filter by it
+    // Otherwise return all (first time view)
+    if (eventId && eventId !== "all") {
+      // Try to match region by ID or by region_name
+      return allPolygons.filter((p) => {
+        const regionLower = (p.region_name || "").toLowerCase().replace(/\s+/g, "_");
+        return regionLower === eventId || p.region_name === eventId;
+      });
+    }
+    
+    return allPolygons;
+  } catch (err) {
+    console.error("Error fetching polygons:", err);
+    return [];
+  }
 }
 
 // ─── SUBSCRIBERS ────────────────────────────────────────────────────────────

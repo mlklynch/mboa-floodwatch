@@ -9,6 +9,7 @@ import SidePanel from "./components/SidePanel";
 import MboaMap from "./components/MboaMap";
 import useFloodData from "./hooks/useFloodData";
 import useGeolocation from "./hooks/useGeolocation";
+import { getSessionUser, setSessionUser, clearSessionUser } from "./services/authStorage";
 
 export default function App() {
   const {
@@ -30,6 +31,7 @@ export default function App() {
   } = useGeolocation();
 
   const [toast, setToast] = useState(null);
+  const [user, setUser] = useState(null);
 
   // Toast notification handler
   const showToast = useCallback((message, type = "success") => {
@@ -43,10 +45,29 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  // Load current session user from localStorage
+  useEffect(() => {
+    const stored = getSessionUser();
+    if (stored) {
+      setUser(stored);
+    }
+  }, []);
+
   // Trigger geolocation with current polygons
   const handleLocate = useCallback(() => {
     locate(polygons);
   }, [locate, polygons]);
+
+  const handleAuthenticated = useCallback((subscriber) => {
+    const sessionUser = setSessionUser(subscriber);
+    setUser(sessionUser);
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    setUser(null);
+    clearSessionUser();
+    showToast("Deconnexion reussie.", "success");
+  }, [showToast]);
 
   // Scroll side panel to subscribe form
   const handleSubscribeClick = useCallback(() => {
@@ -58,10 +79,11 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Navbar onSubscribeClick={handleSubscribeClick} />
+      <Navbar user={user} onSubscribeClick={handleSubscribeClick} />
 
       <div className="main-content">
         <SidePanel
+          user={user}
           stats={stats}
           events={events}
           selectedEventId={selectedEventId}
@@ -69,6 +91,8 @@ export default function App() {
           loading={loading}
           isDemo={isDemo}
           onToast={showToast}
+          onAuthenticated={handleAuthenticated}
+          onLogout={handleLogout}
         />
 
         <MboaMap

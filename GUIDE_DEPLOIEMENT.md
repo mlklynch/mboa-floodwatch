@@ -253,7 +253,18 @@ Ouvrir l'URL fournie dans un navigateur :
 - **URL principale :** `https://mboa-floodwatch-5227b.web.app`
 - **URL alternative :** `https://mboa-floodwatch-5227b.firebaseapp.com`
 
-> **Domaine personnalise (optionnel) :** Pour utiliser `mboa-floodwatch.cm`, aller dans Firebase Console > Hosting > Ajouter un domaine personnalise, puis configurer les enregistrements DNS chez votre registrar.
+> **Domaine personnalisé recommandé :** `floodwatch.cm`
+>
+> Pour utiliser `floodwatch.cm`, allez dans Firebase Console > Hosting > Ajouter un domaine personnalisé et saisissez `floodwatch.cm`.
+>
+> Ensuite, configurez les enregistrements DNS chez votre registrar :
+>
+> - `A` vers `199.36.158.100`
+> - `A` vers `199.36.158.101`
+> - `A` vers `199.36.158.102`
+> - `A` vers `199.36.158.103`
+>
+> Firebase générera un certificat SSL automatiquement après vérification DNS.
 
 ---
 

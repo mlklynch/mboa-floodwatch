@@ -5,8 +5,9 @@
 
 import React, { useState } from "react";
 import { registerSubscriber } from "../services/floodService";
+import { saveSubscriberToStorage } from "../services/authStorage";
 
-export default function SubscribeForm({ onSuccess, onError }) {
+export default function SubscribeForm({ onSuccess, onError, onRegistered }) {
   const [formData, setFormData] = useState({
     name: "",
     city: "",
@@ -50,18 +51,35 @@ export default function SubscribeForm({ onSuccess, onError }) {
         }
       }
 
+      const subscriber = {
+        name: formData.name.trim(),
+        city: formData.city.trim(),
+        phone: formData.phone.trim(),
+        email: formData.email.trim(),
+      };
+
       await registerSubscriber({
-        ...formData,
+        ...subscriber,
         latitude,
         longitude,
       });
 
+      saveSubscriberToStorage(subscriber);
       onSuccess("Inscription reussie ! Vous recevrez les alertes inondation.");
+      onRegistered?.(subscriber);
       setFormData({ name: "", city: "", phone: "", email: "" });
     } catch (err) {
       console.warn("Subscribe error:", err);
       // In demo mode, still show success
+      const subscriber = {
+        name: formData.name.trim(),
+        city: formData.city.trim(),
+        phone: formData.phone.trim(),
+        email: formData.email.trim(),
+      };
+      saveSubscriberToStorage(subscriber);
       onSuccess("Inscription enregistree (mode demo). Merci !");
+      onRegistered?.(subscriber);
       setFormData({ name: "", city: "", phone: "", email: "" });
     }
     setSubmitting(false);

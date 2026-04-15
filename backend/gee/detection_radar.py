@@ -103,6 +103,13 @@ CHEFS_LIEUX_CAMEROUN = [
         "lon": 9.45,
         "buffer_km": 30,
     },
+    {
+        "name": "Ebolowa",
+        "region": "Sud",
+        "lat": 2.9,
+        "lon": 11.15,
+        "buffer_km": 30,
+    },
 ]
 
 # ─── Initialisation des Services ─────────────────────────────────────────────
@@ -355,7 +362,7 @@ def run_flood_detection_pipeline(
 
 def run_analysis_all_chefs_lieux(before_start, before_end, after_start, after_end):
     """
-    Lance l'analyse de detection d'inondations pour tous les 10 chefs-lieux
+    Lance l'analyse de detection d'inondations pour tous les 11 chefs-lieux
     du Cameroun.
 
     Args:
@@ -365,7 +372,7 @@ def run_analysis_all_chefs_lieux(before_start, before_end, after_start, after_en
         after_end:    Date fin de la periode 'apres' (ex: '2026-10-31')
     """
     print("\n" + "="*70)
-    print("  ANALYSE SIMULTANEE - 10 CHEFS-LIEUX DU CAMEROUN")
+    print("  ANALYSE SIMULTANEE - 11 CHEFS-LIEUX DU CAMEROUN")
     print("="*70)
 
     all_results = {}
@@ -432,17 +439,17 @@ def run_analysis_all_chefs_lieux(before_start, before_end, after_start, after_en
 if __name__ == "__main__":
     print("\n  MBOA-FLOODWATCH")
     print("  Pipeline Sentinel-1 SAR -> Firestore")
-    print("  Detection d'inondations sur 10 chefs-lieux\n")
+    print("  Detection d'inondations sur 11 chefs-lieux\n")
 
     initialize_services()
 
     try:
         # Parametres de l'analyse (A adapter selon votre cas d'usage)
         run_analysis_all_chefs_lieux(
-            before_start="2026-03-01",
-            before_end="2026-03-20",
-            after_start="2026-04-01",
-            after_end="2026-04-11",
+            before_start="2026-01-15",
+            before_end="2026-02-05",
+            after_start="2026-02-15",
+            after_end="2026-03-10",
         )
     except Exception as e:
         print(f"[ERREUR CRITIQUE] {e}")
